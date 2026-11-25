@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OutlierScope — Isolation Forest Anomaly Explorer</title>
+    <meta
+      name="description"
+      content="Upload a CSV dataset, tune Isolation Forest parameters, and inspect detected anomalies interactively."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  </head>
+  <body>
+    <header class="top-bar">
+      <a href="/" class="brand-wordmark">OutlierScope</a>
+      <nav class="top-nav" aria-label="Primary sections">
+        <a href="#scatter-section" class="nav-link">Scatter Plot</a>
+        <a href="#distribution-section" class="nav-link">Score Distribution</a>
+        <a href="#top-anomalies-section" class="nav-link">Top Anomalies</a>
+        <a href="#guide-section" class="nav-link">How to Read This</a>
+      </nav>
+      <div class="top-actions">
+        <button
+          type="button"
+          id="downloadCsvTopBtn"
+          class="btn btn-primary"
+          disabled
+        >
+          Download results CSV
+        </button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="control-panel" aria-label="Dataset and model controls">
+        <div class="panel-header">
+          <h1 class="panel-title">Model Controls</h1>
+          <button type="button" id="resetBtn" class="btn btn-ghost">Reset</button>
+        </div>
+
+        <div id="errorBanner" class="alert alert-error hidden" role="alert"></div>
+        <div id="warningBanner" class="alert alert-warning hidden" role="status"></div>
+
+        <section class="control-group">
+          <label for="exampleSelect" class="control-label">Example Dataset</label>
+          <select id="exampleSelect" class="input-select">
+            <option value="">Loading examples...</option>
+          </select>
+          <p id="exampleDescription" class="help-text">
+            Start with a bundled dataset or upload your own CSV below.
+          </p>
+        </section>
+
+        <section class="control-group">
+          <label for="csvFileInput" class="control-label">Upload Custom CSV</label>
+          <div id="dropZone" class="drop-zone">
+            <input
+              type="file"
+              id="csvFileInput"
+              accept=".csv,text/csv"
+              class="file-input-hidden"
+            />
+            <button type="button" id="chooseFileBtn" class="btn btn-secondary">
+              Choose CSV file
+            </button>
+            <span class="drop-hint">or drag and drop here (max 5 MB)</span>
+          </div>
+          <p id="datasetMeta" class="meta-line">No dataset loaded yet.</p>
+        </section>
+
+        <div class="divider"></div>
+
+        <section class="control-group">
+          <div class="label-row">
+            <span id="featuresLabel" class="control-label">Model Features</span>
+            <button type="button" id="selectAllFeaturesBtn" class="link-action">
+              Select all
+            </button>
+          </div>
+          <div
+            id="featureCheckboxes"
+            class="checkbox-list"
+            role="group"
+            aria-labelledby="featuresLabel"
+          ></div>
+          <p class="help-text">
+            Select at least 2 numeric columns. Isolation Forest checks for unusual combinations across all chosen columns.
+          </p>
+        </section>
+
+        <section class="control-group axis-grid">
+          <div class="axis-field">
+            <label for="xAxisSelect" class="control-label">X-Axis</label>
+            <select id="xAxisSelect" class="input-select"></select>
+          </div>
+          <div class="axis-field">
+            <label for="yAxisSelect" class="control-label">Y-Axis</label>
+            <select id="yAxisSelect" class="input-select"></select>
+          </div>
+          <p class="help-text axis-help">
+            Choose any two numeric columns to plot. Switching axes updates the scatter plot instantly.
+          </p>
+        </section>
+
+        <div class="divider"></div>
+
+        <section class="control-group">
+          <div class="label-row">
+            <label for="contaminationSlider" class="control-label">Contamination</label>
+            <span id="contaminationValue" class="mono-value">0.020 (2.0%)</span>
+          </div>
+          <input
+            type="range"
+            id="contaminationSlider"
+            min="0.001"
+            max="0.500"
+            step="0.001"
+            value="0.020"
+            class="range-slider"
+          />
+          <label class="inline-check">
+            <input type="checkbox" id="contaminationAuto" />
+            <span>Use automatic threshold (auto)</span>
+          </label>
+          <p class="help-text">
+            Contamination: the share of points you expect to be anomalies. Higher means more points flagged.
+          </p>
+        </section>
+
+        <section class="control-group">
+          <div class="label-row">
+            <label for="estimatorsSlider" class="control-label">Trees (n_estimators)</label>
+            <span id="estimatorsValue" class="mono-value">100</span>
+          </div>
+          <input
+            type="range"
+            id="estimatorsSlider"
+            min="10"
+            max="500"
+            step="10"
+            value="100"
+            class="range-slider"
+          />
+          <p class="help-text">
+            Number of isolation trees built. More trees yield steadier scores; fewer trees compute faster.
+          </p>
+        </section>
+
+        <section class="control-group">
+          <label for="missingStrategySelect" class="control-label">Missing Values</label>
+          <select id="missingStrategySelect" class="input-select">
+            <option value="impute">Fill with column median (keep all rows)</option>
+            <option value="drop">Drop rows with missing values</option>
+          </select>
+          <p id="missingStatusText" class="help-text">
+            Empty numeric cells are handled automatically before scaling.
+          </p>
+        </section>
+      </aside>
+
+      <section class="viz-area" aria-label="Detection results and visualizations">
+        <div class="summary-grid" aria-label="Summary metrics">
+          <article class="summary-card">
+            <p class="summary-label">Rows Analyzed</p>
+            <p id="statTotalRows" class="summary-value">—</p>
+            <p id="statMissingNote" class="summary-sub">Waiting for dataset</p>
+          </article>
+          <article class="summary-card">
+            <p class="summary-label">Flagged Anomalies</p>
+            <p id="statAnomalyCount" class="summary-value">—</p>
+            <p id="statAnomalyPct" class="summary-sub">0.0% of rows</p>
+          </article>
+          <article class="summary-card">
+            <p class="summary-label">Score Threshold</p>
+            <p id="statThreshold" class="summary-value">—</p>
+            <p id="statContaminationMode" class="summary-sub">Cutoff on 0–1 scale</p>
+          </article>
+          <article class="summary-card">
+            <p id="statFourthLabel" class="summary-label">Ground-Truth Accuracy</p>
+            <p id="statFourthValue" class="summary-value">—</p>
+            <p id="statFourthSub" class="summary-sub">Precision / Recall</p>
+          </article>
+        </div>
+
+        <article id="scatter-section" class="surface-panel">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Anomaly Scatter Plot</h2>
+              <p id="projectionNote" class="section-subtitle">
+                Normal observations shown in blue; flagged anomalies shown as larger red markers.
+              </p>
+            </div>
+            <div id="loadingIndicator" class="loading-indicator hidden" aria-live="polite">
+              <span class="spinner" aria-hidden="true"></span>
+              <span>Updating model...</span>
+            </div>
+          </div>
+          <div id="scatterPlot" class="chart-container chart-scatter"></div>
+        </article>
+
+        <article id="distribution-section" class="surface-panel">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Anomaly Score Distribution</h2>
+              <p class="section-subtitle">
+                Higher scores indicate observations isolated in fewer random splits. Dashed line marks the active threshold.
+              </p>
+            </div>
+          </div>
+          <div id="scoreHistogram" class="chart-container chart-histogram"></div>
+        </article>
+
+        <article id="top-anomalies-section" class="surface-panel">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Top 20 Most Anomalous Rows</h2>
+              <p id="tableSubtitle" class="section-subtitle">
+                Click any column header to sort. Export includes all rows, scores, and labels.
+              </p>
+            </div>
+            <button type="button" id="downloadCsvTableBtn" class="btn btn-secondary" disabled>
+              Download results CSV
+            </button>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" id="anomaliesTable">
+              <thead id="anomaliesTableHead"></thead>
+              <tbody id="anomaliesTableBody"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article id="guide-section" class="surface-panel guide-panel">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">How to Read This</h2>
+              <p class="section-subtitle">
+                A plain-language guide to interpreting Isolation Forest scores and parameters.
+              </p>
+            </div>
+          </div>
+
+          <div class="guide-grid">
+            <div class="guide-item">
+              <h3 class="guide-heading">What the anomaly score means</h3>
+              <p class="guide-copy">
+                Isolation Forest builds random decision trees that split your data. Unusual points sit far from dense clusters and take fewer splits to isolate. Scores are normalized from <strong>0.00</strong> (very typical) to <strong>1.00</strong> (most isolated).
+              </p>
+            </div>
+            <div class="guide-item">
+              <h3 class="guide-heading">How Contamination sets the threshold</h3>
+              <p class="guide-copy">
+                Contamination tells the model roughly what fraction of rows you expect to be outliers. Raising it lowers the score threshold so more borderline points are flagged; choosing <strong>auto</strong> lets the algorithm pick its default boundary.
+              </p>
+            </div>
+            <div class="guide-item">
+              <h3 class="guide-heading">Stability vs. speed with n_estimators</h3>
+              <p class="guide-copy">
+                <strong>n_estimators</strong> controls how many random trees are averaged together. Using 150–300 trees produces more repeatable results across runs, while 20–50 trees gives faster feedback on larger CSVs.
+              </p>
+            </div>
+            <div class="guide-item guide-caution">
+              <h3 class="guide-heading">Candidates for review, not confirmed problems</h3>
+              <p class="guide-copy">
+                Flagged points are statistical outliers relative to the chosen columns—not automatic proof of fraud, attack, or defect. Always inspect high-scoring rows with domain context before taking action.
+              </p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

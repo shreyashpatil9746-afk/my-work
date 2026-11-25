@@ -1,0 +1,6 @@
+{
+  "name": "OutlierScope Anomaly Explorer",
+  "description": "Interactive Isolation Forest anomaly detection web app for uploading CSV datasets, tuning hyperparameters, and inspecting anomalies on interactive charts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

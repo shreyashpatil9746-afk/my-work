@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node / Build artifacts
+node_modules/
+build/
+dist/
+coverage/
+
+# OS & Logs
+.DS_Store
+*.log
+
+# Environment
+.env*
+!.env.example
